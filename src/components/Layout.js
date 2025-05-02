@@ -1,0 +1,55 @@
+import React from 'react';
+import { NavLink, useNavigate } from 'react-router-dom';
+
+function Layout({ children, user, setIsAuthenticated }) {
+  const navigate = useNavigate();
+
+  const handleLogout = () => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    setIsAuthenticated(false);
+    navigate('/login');
+  };
+
+  return (
+    <div className="app-container">
+      <div className="sidebar">
+        <div className="sidebar-header">
+          <h3>Senaryo App</h3>
+          <div className="user-welcome">Hoş geldin, {user?.username}</div>
+        </div>
+        
+        <nav className="sidebar-nav">
+          <NavLink 
+            to="/dashboard" 
+            className={({ isActive }) => isActive ? "nav-link active" : "nav-link"}
+          >
+            <i className="nav-icon">📝</i>
+            Senaryo Oluştur
+          </NavLink>
+          
+          <NavLink 
+            to="/scenarios" 
+            className={({ isActive }) => isActive ? "nav-link active" : "nav-link"}
+          >
+            <i className="nav-icon">📚</i>
+            Senaryolar
+          </NavLink>
+        </nav>
+        
+        <div className="sidebar-footer">
+          <button onClick={handleLogout} className="logout-button">
+            <i className="logout-icon">🚪</i>
+            Çıkış Yap
+          </button>
+        </div>
+      </div>
+      
+      <div className="main-content">
+        {children}
+      </div>
+    </div>
+  );
+}
+
+export default Layout;
