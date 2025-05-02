@@ -1,3 +1,4 @@
+/* Mevcut stil tanımları burada kalacak */
 * {
   box-sizing: border-box;
   margin: 0;
@@ -52,7 +53,7 @@ body {
   color: #2c3e50;
 }
 
-.form-group input {
+.form-group input, .form-group select {
   width: 100%;
   padding: 10px 15px;
   font-size: 16px;
@@ -61,7 +62,7 @@ body {
   transition: border-color 0.3s;
 }
 
-.form-group input:focus {
+.form-group input:focus, .form-group select:focus {
   outline: none;
   border-color: #3498db;
 }
@@ -83,6 +84,11 @@ body {
   background-color: #2980b9;
 }
 
+.auth-button:disabled {
+  background-color: #95a5a6;
+  cursor: not-allowed;
+}
+
 .auth-link {
   margin-top: 20px;
   text-align: center;
@@ -102,6 +108,15 @@ body {
   margin-bottom: 15px;
   background-color: #f8d7da;
   color: #721c24;
+  border-radius: 4px;
+  text-align: center;
+}
+
+.success-message {
+  padding: 10px;
+  margin-bottom: 15px;
+  background-color: #d4edda;
+  color: #155724;
   border-radius: 4px;
   text-align: center;
 }
@@ -128,6 +143,24 @@ body {
   display: flex;
   align-items: center;
   gap: 15px;
+}
+
+.user-team-info {
+  background-color: #f8f9fa;
+  padding: 10px 15px;
+  border-radius: 4px;
+  margin-bottom: 20px;
+  border-left: 4px solid #3498db;
+}
+
+.admin-badge {
+  display: inline-block;
+  background-color: #e74c3c;
+  color: white;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  margin-left: 10px;
 }
 
 .logout-button {
@@ -177,6 +210,11 @@ body {
   background-color: #27ae60;
 }
 
+.submit-button:disabled {
+  background-color: #95a5a6;
+  cursor: not-allowed;
+}
+
 .scenario-result {
   margin-top: 30px;
   padding-top: 20px;
@@ -196,11 +234,16 @@ body {
   font-size: 18px;
   color: #3498db;
 }
+
 .loading-indicator {
   display: flex;
   flex-direction: column;
   align-items: center;
   margin: 20px 0;
+}
+
+.loading-indicator.centered {
+  margin: 50px auto;
 }
 
 .spinner {
@@ -222,11 +265,6 @@ body {
   }
 }
 
-/* Disabled buton stilleri */
-.submit-button:disabled {
-  background-color: #95a5a6;
-  cursor: not-allowed;
-}
 /* Sidebar ve Layout Stilleri */
 .app-container {
   display: flex;
@@ -258,6 +296,12 @@ body {
 .user-welcome {
   font-size: 0.9rem;
   opacity: 0.8;
+}
+
+.user-team {
+  font-size: 0.85rem;
+  opacity: 0.7;
+  margin-top: 5px;
 }
 
 .sidebar-nav {
@@ -294,28 +338,6 @@ body {
   border-top: 1px solid rgba(255, 255, 255, 0.1);
 }
 
-.logout-button {
-  width: 100%;
-  padding: 10px;
-  background-color: rgba(231, 76, 60, 0.8);
-  color: white;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  transition: background-color 0.3s;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.logout-button:hover {
-  background-color: #c0392b;
-}
-
-.logout-icon {
-  margin-right: 8px;
-}
-
 .main-content {
   flex: 1;
   margin-left: 250px;
@@ -323,8 +345,150 @@ body {
   overflow-y: auto;
 }
 
-/* Dashboard İçerik Stilleri */
-.dashboard-content {
+/* Header Actions and Filters */
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 30px;
+}
+
+.header-actions {
+  display: flex;
+  gap: 15px;
+  align-items: center;
+}
+
+.filter-container {
+  position: relative;
+}
+
+.category-filter {
+  padding: 8px 15px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  background-color: white;
+  font-size: 14px;
+  min-width: 180px;
+}
+
+.refresh-button {
+  background-color: #4a90e2;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 8px 16px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+  display: flex;
+  align-items: center;
+}
+
+.refresh-button:hover {
+  background-color: #357abf;
+}
+
+.refresh-button:disabled {
+  background-color: #a0a0a0;
+  cursor: not-allowed;
+}
+
+/* Admin Panel Styles */
+.admin-panel {
+  padding: 20px;
+  background-color: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.admin-tabs {
+  display: flex;
+  margin-bottom: 20px;
+  border-bottom: 1px solid #ddd;
+  overflow-x: auto;
+}
+
+.tab-button {
+  padding: 10px 20px;
+  background: none;
+  border: none;
+  font-size: 16px;
+  cursor: pointer;
+  opacity: 0.7;
+  position: relative;
+  transition: opacity 0.3s;
+}
+
+.tab-button:hover {
+  opacity: 0.9;
+}
+
+.tab-button.active {
+  opacity: 1;
+  font-weight: 500;
+}
+
+.tab-button.active::after {
+  content: '';
+  position: absolute;
+  bottom: -1px;
+  left: 0;
+  width: 100%;
+  height: 3px;
+  background-color: #3498db;
+}
+
+.tab-content {
+  padding: 20px 0;
+}
+
+.admin-form {
+  max-width: 500px;
+  margin-bottom: 30px;
+}
+
+.admin-list {
+  overflow-x: auto;
+}
+
+.admin-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.admin-table th, .admin-table td {
+  border: 1px solid #ddd;
+  padding: 10px;
+  text-align: left;
+}
+
+.admin-table th {
+  background-color: #f8f9fa;
+  font-weight: 500;
+}
+
+.admin-table tr:nth-child(even) {
+  background-color: #f9f9f9;
+}
+
+.add-category-button {
+  background-color: #2ecc71;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 8px 16px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+.add-category-button:hover {
+  background-color: #27ae60;
+}
+
+/* Senaryolar Sayfası Stilleri */
+.scenarios-content {
   padding: 20px;
 }
 
@@ -332,11 +496,6 @@ body {
   margin-bottom: 30px;
   color: #2c3e50;
   font-weight: 500;
-}
-
-/* Senaryolar Sayfası Stilleri */
-.scenarios-content {
-  padding: 20px;
 }
 
 .scenarios-grid {
@@ -376,6 +535,29 @@ body {
 .scenario-date {
   font-size: 0.85rem;
   color: #7f8c8d;
+}
+
+.scenario-info {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 10px;
+  font-size: 0.85rem;
+  color: #7f8c8d;
+}
+
+.info-label {
+  font-weight: 500;
+  color: #2c3e50;
+}
+
+.scenario-team, .scenario-category {
+  padding: 2px 8px;
+  background-color: #f8f9fa;
+  border-radius: 4px;
+}
+
+.scenario-preview {
+  margin-top: 10px;
 }
 
 .scenario-preview h4 {
@@ -455,6 +637,57 @@ body {
   color: #2c3e50;
 }
 
+.scenario-meta {
+  background-color: #f8f9fa;
+  padding: 15px;
+  border-radius: 4px;
+  margin-bottom: 20px;
+  display: flex;
+  justify-content: space-between;
+}
+
+.scenario-team-info, .scenario-category-info {
+  flex: 1;
+}
+
+.editable-category {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.edit-category-button {
+  background-color: #3498db;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 3px 8px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.category-editor {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.category-select {
+  padding: 5px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+}
+
+.cancel-button {
+  background-color: #e74c3c;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 3px 8px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
 .scenario-section {
   margin-bottom: 20px;
 }
@@ -474,38 +707,4 @@ body {
 
 .ongoruler-text {
   color: #7f8c8d;
-}
-
-/* Loading spinner centred */
-.loading-indicator.centered {
-  margin: 50px auto;
-}
-
-/* Yenile butonu stilleri */
-.refresh-button {
-  background-color: #4a90e2;
-  color: white;
-  border: none;
-  border-radius: 4px;
-  padding: 8px 16px;
-  font-size: 14px;
-  cursor: pointer;
-  transition: background-color 0.3s ease;
-  display: flex;
-  align-items: center;
-}
-
-.refresh-button:hover {
-  background-color: #357abf;
-}
-
-.refresh-button:disabled {
-  background-color: #a0a0a0;
-  cursor: not-allowed;
-}
-
-/* İsteğe bağlı: Yenile butonuna ikon eklemek isterseniz */
-.refresh-button::before {
-  content: "🔄"; /* Unicode yenileme simgesi */
-  margin-right: 6px;
 }
