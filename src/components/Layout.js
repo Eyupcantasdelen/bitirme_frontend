@@ -19,7 +19,10 @@ function Layout({ children, user, setIsAuthenticated }) {
           <div className="user-welcome">
             <div>Hoş geldin, {user?.username}</div>
             {user?.teamName && <div className="user-team">Ekip: {user.teamName}</div>}
-            {user?.isAdmin && <div className="admin-badge">Admin</div>}
+            <div className="user-roles">
+              {user?.isAdmin && <div className="admin-badge">Admin</div>}
+              {user?.isTeamLeader && <div className="team-leader-badge">Takım Lideri</div>}
+            </div>
           </div>
         </div>
         
@@ -39,6 +42,17 @@ function Layout({ children, user, setIsAuthenticated }) {
             <i className="nav-icon">📚</i>
             Senaryolar
           </NavLink>
+          
+          {/* Takım Lideri için Onay Sayfası */}
+          {user?.isTeamLeader && (
+            <NavLink 
+              to="/approval" 
+              className={({ isActive }) => isActive ? "nav-link active" : "nav-link"}
+            >
+              <i className="nav-icon">✅</i>
+              Onay Bekleyenler
+            </NavLink>
+          )}
           
           {user?.isAdmin && (
             <NavLink 

@@ -6,6 +6,7 @@ import Layout from './Layout';
 function AdminPanel({ setIsAuthenticated }) {
   const [user, setUser] = useState(null);
   const [teams, setTeams] = useState([]);
+  const [teamsWithLeaders, setTeamsWithLeaders] = useState([]);
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('teams');
@@ -18,6 +19,12 @@ function AdminPanel({ setIsAuthenticated }) {
   const [users, setUsers] = useState([]);
   const [selectedUser, setSelectedUser] = useState(null);
   const [selectedTeamId, setSelectedTeamId] = useState('');
+  
+  // Takım lideri yönetimi için state'ler
+  const [selectedTeamForLeader, setSelectedTeamForLeader] = useState('');
+  const [selectedLeaderUser, setSelectedLeaderUser] = useState('');
+  const [teamUsersForLeader, setTeamUsersForLeader] = useState([]);
+
   // Takımları getir
   const fetchTeams = useCallback(async () => {
     try {
@@ -46,7 +53,35 @@ function AdminPanel({ setIsAuthenticated }) {
       setLoading(false);
     }
   }, [navigate, setIsAuthenticated]);
-  // Kullanıcıları getirme fonksiyonu:
+
+  // Takım lideri bilgileri ile takımları getir
+  const fetchTeamsWithLeaders = useCallback(async () => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        navigate('/login');
+        return;
+      }
+
+      const response = await axios.get('http://localhost:8000/api/admin/teams-with-leaders', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      setTeamsWithLeaders(response.data.teams || []);
+    } catch (err) {
+      console.error('Error fetching teams with leaders:', err);
+      setError('Takım lideri bilgileri yüklenirken bir hata oluştu.');
+
+      if (err.response && err.response.status === 401) {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        setIsAuthenticated(false);
+        navigate('/login');
+      }
+    }
+  }, [navigate, setIsAuthenticated]);
+
+  // Kullanıcıları getirme fonksiyonu
   const fetchUsers = useCallback(async () => {
     try {
       const token = localStorage.getItem('token');
@@ -99,6 +134,7 @@ function AdminPanel({ setIsAuthenticated }) {
       }
     }
   }, [navigate, setIsAuthenticated]);
+
   // Kullanıcının takımını güncelleme fonksiyonu
   const updateUserTeam = async () => {
     if (!selectedUser || !selectedTeamId) {
@@ -116,13 +152,9 @@ function AdminPanel({ setIsAuthenticated }) {
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
-      // Başarı mesajı göster
       setSuccess(`${selectedUser.username} kullanıcısının takımı başarıyla güncellendi`);
-
-      // Kullanıcıları yeniden yükle
       fetchUsers();
-
-      // Seçimleri sıfırla
+      fetchTeamsWithLeaders();
       setSelectedUser(null);
       setSelectedTeamId('');
     } catch (err) {
@@ -131,14 +163,78 @@ function AdminPanel({ setIsAuthenticated }) {
     }
   };
 
+  // Takım seçildiğinde o takımın kullanıcılarını getir
+  const handleTeamSelectionForLeader = (teamId) => {
+    setSelectedTeamForLeader(teamId);
+    setSelectedLeaderUser('');
+    
+    if (teamId) {
+      const teamUsers = users.filter(user => user.teamId === teamId && !user.isAdmin);
+      setTeamUsersForLeader(teamUsers);
+    } else {
+      setTeamUsersForLeader([]);
+    }
+  };
+
+  // Takım lideri atama
+  const assignTeamLeader = async () => {
+    if (!selectedTeamForLeader || !selectedLeaderUser) {
+      setError('Takım ve kullanıcı seçilmelidir');
+      return;
+    }
+
+    try {
+      setError('');
+      setSuccess('');
+
+      const token = localStorage.getItem('token');
+      await axios.put(`http://localhost:8000/api/admin/teams/${selectedTeamForLeader}/assign-leader`,
+        { userId: selectedLeaderUser },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      setSuccess('Takım lideri başarıyla atandı');
+      fetchUsers();
+      fetchTeamsWithLeaders();
+      setSelectedTeamForLeader('');
+      setSelectedLeaderUser('');
+      setTeamUsersForLeader([]);
+    } catch (err) {
+      console.error('Error assigning team leader:', err);
+      setError(err.response?.data?.error || 'Takım lideri atanırken bir hata oluştu');
+    }
+  };
+
+  // Takım lideri kaldırma
+  const removeTeamLeader = async (teamId) => {
+    if (!window.confirm('Bu takımın liderini kaldırmak istediğinizden emin misiniz?')) {
+      return;
+    }
+
+    try {
+      setError('');
+      setSuccess('');
+
+      const token = localStorage.getItem('token');
+      await axios.delete(`http://localhost:8000/api/admin/teams/${teamId}/remove-leader`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      setSuccess('Takım lideri başarıyla kaldırıldı');
+      fetchUsers();
+      fetchTeamsWithLeaders();
+    } catch (err) {
+      console.error('Error removing team leader:', err);
+      setError(err.response?.data?.error || 'Takım lideri kaldırılırken bir hata oluştu');
+    }
+  };
+
   useEffect(() => {
-    // Kullanıcı bilgilerini localStorage'dan al
     const storedUser = localStorage.getItem('user');
     if (storedUser) {
       const parsedUser = JSON.parse(storedUser);
       setUser(parsedUser);
 
-      // Admin olmayan kullanıcıları bu sayfaya erişimden engelle
       if (!parsedUser.isAdmin) {
         navigate('/dashboard');
       }
@@ -146,11 +242,11 @@ function AdminPanel({ setIsAuthenticated }) {
       navigate('/login');
     }
 
-    // Veri yükle
     fetchTeams();
     fetchCategories();
     fetchUsers();
-  }, [navigate, fetchTeams, fetchCategories, fetchUsers]);
+    fetchTeamsWithLeaders();
+  }, [navigate, fetchTeams, fetchCategories, fetchUsers, fetchTeamsWithLeaders]);
 
   const handleNewTeamChange = (e) => {
     setNewTeam({ ...newTeam, [e.target.name]: e.target.value });
@@ -165,7 +261,6 @@ function AdminPanel({ setIsAuthenticated }) {
     setError('');
     setSuccess('');
 
-    // Boş alan kontrolü
     if (!newTeam.teamId.trim() || !newTeam.teamName.trim()) {
       setError('Takım ID ve Takım Adı alanları zorunludur');
       return;
@@ -177,10 +272,10 @@ function AdminPanel({ setIsAuthenticated }) {
         headers: { Authorization: `Bearer ${token}` }
       });
 
-      // Başarılı ekleme sonrası
       setSuccess('Takım başarıyla eklendi');
       setNewTeam({ teamId: '', teamName: '' });
       fetchTeams();
+      fetchTeamsWithLeaders();
     } catch (err) {
       console.error('Error adding team:', err);
       setError(err.response?.data?.error || 'Takım eklenirken bir hata oluştu');
@@ -192,7 +287,6 @@ function AdminPanel({ setIsAuthenticated }) {
     setError('');
     setSuccess('');
 
-    // Boş alan kontrolü
     if (!newCategory.trim()) {
       setError('Kategori adı zorunludur');
       return;
@@ -204,7 +298,6 @@ function AdminPanel({ setIsAuthenticated }) {
         headers: { Authorization: `Bearer ${token}` }
       });
 
-      // Başarılı ekleme sonrası
       setSuccess('Kategori başarıyla eklendi');
       setNewCategory('');
       fetchCategories();
@@ -213,6 +306,17 @@ function AdminPanel({ setIsAuthenticated }) {
       setError(err.response?.data?.error || 'Kategori eklenirken bir hata oluştu');
     }
   };
+
+  // Mesajları otomatik temizle
+  useEffect(() => {
+    if (error || success) {
+      const timer = setTimeout(() => {
+        setError('');
+        setSuccess('');
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [error, success]);
 
   return (
     <Layout user={user} setIsAuthenticated={setIsAuthenticated}>
@@ -227,17 +331,23 @@ function AdminPanel({ setIsAuthenticated }) {
             Takımlar
           </button>
           <button
+            className={`tab-button ${activeTab === 'team-leaders' ? 'active' : ''}`}
+            onClick={() => setActiveTab('team-leaders')}
+          >
+            Takım Liderleri
+          </button>
+          <button
             className={`tab-button ${activeTab === 'categories' ? 'active' : ''}`}
             onClick={() => setActiveTab('categories')}
           >
             Kategoriler
           </button>
           <button
-          className={`tab-button ${activeTab === 'users' ? 'active' : ''}`}
-          onClick={() => setActiveTab('users')}
-        >
-          Kullanıcılar
-        </button>
+            className={`tab-button ${activeTab === 'users' ? 'active' : ''}`}
+            onClick={() => setActiveTab('users')}
+          >
+            Kullanıcılar
+          </button>
         </div>
 
         <div className="tab-content">
@@ -246,11 +356,10 @@ function AdminPanel({ setIsAuthenticated }) {
               <div className="spinner"></div>
               <p>Yükleniyor...</p>
             </div>
-          ) : error ? (
-            <div className="error-message">{error}</div>
-          ) : success ? (
-            <div className="success-message">{success}</div>
           ) : null}
+
+          {error && <div className="error-message">{error}</div>}
+          {success && <div className="success-message">{success}</div>}
 
           {activeTab === 'teams' && (
             <div className="teams-tab">
@@ -263,7 +372,7 @@ function AdminPanel({ setIsAuthenticated }) {
                     name="teamId"
                     value={newTeam.teamId}
                     onChange={handleNewTeamChange}
-                    placeholder="Benzersiz takım kodu"
+                    placeholder="Benzersiz takım kodu (örn: sales, marketing)"
                     required
                   />
                 </div>
@@ -278,10 +387,12 @@ function AdminPanel({ setIsAuthenticated }) {
                     required
                   />
                 </div>
-                <button type="submit" className="submit-button">Takım Ekle</button>
+                <button type="submit" className="submit-button" disabled={loading}>
+                  Takım Ekle
+                </button>
               </form>
 
-              <h2>Mevcut Takımlar</h2>
+              <h2>Mevcut Takımlar ({teams.length})</h2>
               {teams.length === 0 ? (
                 <p>Henüz takım bulunmuyor.</p>
               ) : (
@@ -292,14 +403,137 @@ function AdminPanel({ setIsAuthenticated }) {
                         <th>Takım ID</th>
                         <th>Takım Adı</th>
                         <th>Oluşturulma Tarihi</th>
+                        <th>Üye Sayısı</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {teams.map(team => (
+                      {teams.map(team => {
+                        const memberCount = users.filter(user => user.teamId === team.teamId).length;
+                        return (
+                          <tr key={team._id}>
+                            <td>{team.teamId}</td>
+                            <td>{team.teamName}</td>
+                            <td>{new Date(team.createdAt).toLocaleDateString('tr-TR')}</td>
+                            <td>{memberCount} kişi</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
+
+          {activeTab === 'team-leaders' && (
+            <div className="team-leaders-tab">
+              <h2>Takım Lideri Ata</h2>
+              <div className="team-leader-form">
+                <div className="form-group">
+                  <label>Takım Seçin</label>
+                  <select
+                    value={selectedTeamForLeader}
+                    onChange={(e) => handleTeamSelectionForLeader(e.target.value)}
+                    required
+                  >
+                    <option value="">Takım Seçin</option>
+                    {teams.filter(team => team.teamId !== 'admin').map(team => (
+                      <option key={team.teamId} value={team.teamId}>
+                        {team.teamName} ({team.teamId})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {selectedTeamForLeader && teamUsersForLeader.length > 0 && (
+                  <div className="form-group">
+                    <label>Takım Lideri Seçin</label>
+                    <select
+                      value={selectedLeaderUser}
+                      onChange={(e) => setSelectedLeaderUser(e.target.value)}
+                      required
+                    >
+                      <option value="">Kullanıcı Seçin</option>
+                      {teamUsersForLeader.map(user => (
+                        <option key={user._id} value={user._id}>
+                          {user.username} ({user.email})
+                          {user.isTeamLeader ? ' - Mevcut Lider' : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                {selectedTeamForLeader && teamUsersForLeader.length === 0 && (
+                  <div className="no-users-message">
+                    Bu takımda henüz kullanıcı bulunmuyor. Önce kullanıcıları bu takıma atayın.
+                  </div>
+                )}
+
+                <button
+                  type="button"
+                  className="submit-button"
+                  onClick={assignTeamLeader}
+                  disabled={!selectedTeamForLeader || !selectedLeaderUser || loading}
+                >
+                  Takım Lideri Ata
+                </button>
+              </div>
+
+              <h2>Mevcut Takım Liderleri</h2>
+              {teamsWithLeaders.length === 0 ? (
+                <div className="loading-indicator">
+                  <p>Takım bilgileri yükleniyor...</p>
+                </div>
+              ) : (
+                <div className="admin-list">
+                  <table className="admin-table">
+                    <thead>
+                      <tr>
+                        <th>Takım</th>
+                        <th>Takım Lideri</th>
+                        <th>E-posta</th>
+                        <th>Atanma Tarihi</th>
+                        <th>İşlemler</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {teamsWithLeaders.filter(team => team.teamId !== 'admin').map(team => (
                         <tr key={team._id}>
-                          <td>{team.teamId}</td>
-                          <td>{team.teamName}</td>
-                          <td>{new Date(team.createdAt).toLocaleDateString('tr-TR')}</td>
+                          <td>
+                            <strong>{team.teamName}</strong>
+                            <br />
+                            <small style={{color: '#666'}}>({team.teamId})</small>
+                          </td>
+                          <td>
+                            {team.teamLeaderId ? (
+                              <span style={{color: '#28a745', fontWeight: 'bold'}}>
+                                {team.teamLeaderId.username}
+                              </span>
+                            ) : (
+                              <span style={{color: '#dc3545'}}>Lider Atanmamış</span>
+                            )}
+                          </td>
+                          <td>
+                            {team.teamLeaderId ? team.teamLeaderId.email : '-'}
+                          </td>
+                          <td>
+                            {team.teamLeaderId ? 
+                              new Date(team.updatedAt || team.createdAt).toLocaleDateString('tr-TR') 
+                              : '-'
+                            }
+                          </td>
+                          <td>
+                            {team.teamLeaderId && (
+                              <button
+                                className="remove-leader-button"
+                                onClick={() => removeTeamLeader(team.teamId)}
+                                disabled={loading}
+                              >
+                                Lideri Kaldır
+                              </button>
+                            )}
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -319,14 +553,16 @@ function AdminPanel({ setIsAuthenticated }) {
                     type="text"
                     value={newCategory}
                     onChange={handleNewCategoryChange}
-                    placeholder="Kategori adı girin"
+                    placeholder="Kategori adı girin (örn: Teknoloji, Pazarlama)"
                     required
                   />
                 </div>
-                <button type="submit" className="submit-button">Kategori Ekle</button>
+                <button type="submit" className="submit-button" disabled={loading}>
+                  Kategori Ekle
+                </button>
               </form>
 
-              <h2>Mevcut Kategoriler</h2>
+              <h2>Mevcut Kategoriler ({categories.length})</h2>
               {categories.length === 0 ? (
                 <p>Henüz kategori bulunmuyor.</p>
               ) : (
@@ -342,8 +578,12 @@ function AdminPanel({ setIsAuthenticated }) {
                     <tbody>
                       {categories.map(category => (
                         <tr key={category._id}>
-                          <td>{category._id}</td>
-                          <td>{category.name}</td>
+                          <td style={{fontFamily: 'monospace', fontSize: '0.9rem'}}>
+                            {category._id}
+                          </td>
+                          <td>
+                            <strong>{category.name}</strong>
+                          </td>
                           <td>{new Date(category.createdAt).toLocaleDateString('tr-TR')}</td>
                         </tr>
                       ))}
@@ -371,13 +611,15 @@ function AdminPanel({ setIsAuthenticated }) {
                     <option value="">Kullanıcı Seçin</option>
                     {users.map(user => (
                       <option key={user._id} value={user._id}>
-                        {user.username} ({user.email})
+                        {user.username} ({user.email}) - {user.teamName || user.teamId}
+                        {user.isAdmin && ' [Admin]'}
+                        {user.isTeamLeader && ' [Takım Lideri]'}
                       </option>
                     ))}
                   </select>
                 </div>
                 <div className="form-group">
-                  <label>Takım</label>
+                  <label>Yeni Takım</label>
                   <select
                     value={selectedTeamId}
                     onChange={(e) => setSelectedTeamId(e.target.value)}
@@ -386,7 +628,7 @@ function AdminPanel({ setIsAuthenticated }) {
                     <option value="">Takım Seçin</option>
                     {teams.map(team => (
                       <option key={team.teamId} value={team.teamId}>
-                        {team.teamName}
+                        {team.teamName} ({team.teamId})
                       </option>
                     ))}
                   </select>
@@ -395,13 +637,20 @@ function AdminPanel({ setIsAuthenticated }) {
                   type="button"
                   className="submit-button"
                   onClick={updateUserTeam}
-                  disabled={!selectedUser || !selectedTeamId}
+                  disabled={!selectedUser || !selectedTeamId || loading}
                 >
                   Takım Güncelle
                 </button>
+                {selectedUser && (
+                  <div style={{marginTop: '10px', padding: '10px', backgroundColor: '#f8f9fa', borderRadius: '4px'}}>
+                    <small>
+                      <strong>Not:</strong> Kullanıcı takım değiştirildiğinde mevcut takım lideri yetkisi kaldırılacaktır.
+                    </small>
+                  </div>
+                )}
               </div>
 
-              <h2>Kullanıcı Listesi</h2>
+              <h2>Kullanıcı Listesi ({users.length})</h2>
               {users.length === 0 ? (
                 <p>Henüz kullanıcı bulunmuyor.</p>
               ) : (
@@ -412,18 +661,41 @@ function AdminPanel({ setIsAuthenticated }) {
                         <th>Kullanıcı Adı</th>
                         <th>E-posta</th>
                         <th>Takım</th>
-                        <th>Admin</th>
+                        <th>Roller</th>
                         <th>Kayıt Tarihi</th>
+                        <th>Son Aktivite</th>
                       </tr>
                     </thead>
                     <tbody>
                       {users.map(user => (
                         <tr key={user._id}>
-                          <td>{user.username}</td>
+                          <td>
+                            <strong>{user.username}</strong>
+                          </td>
                           <td>{user.email}</td>
-                          <td>{user.teamName || user.teamId}</td>
-                          <td>{user.isAdmin ? 'Evet' : 'Hayır'}</td>
+                          <td>
+                            <span style={{fontWeight: 'bold'}}>
+                              {user.teamName || user.teamId}
+                            </span>
+                            <br />
+                            <small style={{color: '#666'}}>({user.teamId})</small>
+                          </td>
+                          <td>
+                            <div className="user-roles">
+                              {user.isAdmin && <span className="role-badge admin">Admin</span>}
+                              {user.isTeamLeader && <span className="role-badge team-leader">Takım Lideri</span>}
+                              {!user.isAdmin && !user.isTeamLeader && <span className="role-badge user">Kullanıcı</span>}
+                            </div>
+                          </td>
                           <td>{new Date(user.createdAt).toLocaleDateString('tr-TR')}</td>
+                          <td>
+                            <small style={{color: '#666'}}>
+                              {user.lastLoginAt ? 
+                                new Date(user.lastLoginAt).toLocaleDateString('tr-TR') : 
+                                'Henüz giriş yapmamış'
+                              }
+                            </small>
+                          </td>
                         </tr>
                       ))}
                     </tbody>

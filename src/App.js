@@ -6,6 +6,7 @@ import Register from './components/Register';
 import Dashboard from './components/Dashboard';
 import Scenarios from './components/Scenarios';
 import AdminPanel from './components/AdminPanel';
+import ApprovalPage from './components/ApprovalPage';
 import './App.css';
 
 function App() {
@@ -52,7 +53,7 @@ function App() {
   }, []);
 
   // Korumalı route için wrapper component
-  const ProtectedRoute = ({ children, adminRequired = false }) => {
+  const ProtectedRoute = ({ children, adminRequired = false, teamLeaderRequired = false }) => {
     if (loading) return <div className="loading">Yükleniyor...</div>;
     
     if (!isAuthenticated) {
@@ -61,6 +62,11 @@ function App() {
     
     // Admin yetkisi gerekli ise ve kullanıcı admin değilse
     if (adminRequired && user && !user.isAdmin) {
+      return <Navigate to="/dashboard" />;
+    }
+    
+    // Takım lideri yetkisi gerekli ise ve kullanıcı takım lideri veya admin değilse
+    if (teamLeaderRequired && user && !user.isTeamLeader && !user.isAdmin) {
       return <Navigate to="/dashboard" />;
     }
     
@@ -100,6 +106,14 @@ function App() {
             element={
               <ProtectedRoute>
                 <Scenarios setIsAuthenticated={setIsAuthenticated} />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/approval" 
+            element={
+              <ProtectedRoute teamLeaderRequired={true}>
+                <ApprovalPage setIsAuthenticated={setIsAuthenticated} />
               </ProtectedRoute>
             } 
           />

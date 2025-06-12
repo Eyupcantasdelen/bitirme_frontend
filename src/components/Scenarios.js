@@ -14,6 +14,17 @@ function Scenarios({ setIsAuthenticated }) {
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [editingCategory, setEditingCategory] = useState(false);
   const [newCategory, setNewCategory] = useState('');
+  
+  // Düzenleme için state'ler
+  const [isEditing, setIsEditing] = useState(false);
+  const [editingScenario, setEditingScenario] = useState(null);
+  const [editForm, setEditForm] = useState({
+    ongoruler: '',
+    scenario: '',
+    editReason: ''
+  });
+  const [editLoading, setEditLoading] = useState(false);
+  
   const navigate = useNavigate();
 
   // Kategorileri getir
@@ -51,7 +62,6 @@ function Scenarios({ setIsAuthenticated }) {
         return;
       }
       
-      // Kategori filtresine göre senaryoları getir
       const endpoint = selectedCategory === 'all' 
         ? 'http://localhost:8000/api/scenarios'
         : `http://localhost:8000/api/scenarios/filter?category=${selectedCategory}`;
@@ -78,20 +88,15 @@ function Scenarios({ setIsAuthenticated }) {
   }, [navigate, setIsAuthenticated, selectedCategory]);
 
   useEffect(() => {
-    // Kullanıcı bilgilerini localStorage'dan al
     const storedUser = localStorage.getItem('user');
     if (storedUser) {
       setUser(JSON.parse(storedUser));
     }
     
-    // Kategorileri yükle
     fetchCategories();
-    
-    // Senaryoları yükle
     fetchScenarios();
   }, [fetchCategories, fetchScenarios]);
 
-  // Kategori değiştiğinde senaryoları yeniden yükle
   useEffect(() => {
     fetchScenarios();
   }, [selectedCategory, fetchScenarios]);
@@ -103,6 +108,9 @@ function Scenarios({ setIsAuthenticated }) {
   const closeModal = () => {
     setSelectedScenario(null);
     setEditingCategory(false);
+    setIsEditing(false);
+    setEditingScenario(null);
+    setEditForm({ ongoruler: '', scenario: '', editReason: '' });
   };
 
   const handleRefresh = () => {
@@ -114,6 +122,83 @@ function Scenarios({ setIsAuthenticated }) {
     setSelectedCategory(e.target.value);
   };
 
+  // Senaryo düzenleme başlatma
+  const startEditing = (scenario) => {
+    setEditingScenario(scenario);
+    setEditForm({
+      ongoruler: scenario.ongoruler,
+      scenario: scenario.scenario,
+      editReason: ''
+    });
+    setIsEditing(true);
+  };
+
+  // Düzenleme formu değişiklikleri
+  const handleEditFormChange = (e) => {
+    setEditForm({
+      ...editForm,
+      [e.target.name]: e.target.value
+    });
+  };
+
+  // AI modelinden yeni senaryo oluşturma
+  const generateNewScenario = async () => {
+    if (!editForm.ongoruler.trim()) {
+      alert('Öngörüler alanı boş olamaz');
+      return;
+    }
+
+    setEditLoading(true);
+    try {
+      const response = await axios.post('http://localhost:5000/create_scenario', {
+        ongoruler: editForm.ongoruler
+      });
+      
+      setEditForm({
+        ...editForm,
+        scenario: response.data.scenario
+      });
+    } catch (error) {
+      console.error('AI scenario generation error:', error);
+      alert('Senaryo oluşturulurken bir hata oluştu');
+    } finally {
+      setEditLoading(false);
+    }
+  };
+
+  // Senaryo düzenlemeyi kaydetme
+  const saveEdit = async () => {
+    if (!editForm.ongoruler.trim() || !editForm.scenario.trim()) {
+      alert('Öngörüler ve senaryo alanları boş olamaz');
+      return;
+    }
+
+    if (!editForm.editReason.trim()) {
+      alert('Düzenleme nedeni belirtmelisiniz');
+      return;
+    }
+
+    setEditLoading(true);
+    try {
+      const token = localStorage.getItem('token');
+      await axios.put(`http://localhost:8000/api/scenarios/${editingScenario._id}/edit`, 
+        editForm,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      
+      alert('Senaryo başarıyla düzenlendi ve onay için gönderildi!');
+      setIsEditing(false);
+      setEditingScenario(null);
+      setSelectedScenario(null);
+      fetchScenarios();
+    } catch (err) {
+      console.error('Senaryo düzenlenirken hata oluştu:', err);
+      alert('Senaryo düzenlenirken bir hata oluştu');
+    } finally {
+      setEditLoading(false);
+    }
+  };
+
   // Senaryo kategorisini güncelle (sadece admin kullanıcılar için)
   const updateScenarioCategory = async (scenarioId, category) => {
     try {
@@ -123,11 +208,8 @@ function Scenarios({ setIsAuthenticated }) {
         { headers: { Authorization: `Bearer ${token}` } }
       );
       
-      // Senaryoyu güncelle ve modalı kapat
       setSelectedScenario(prev => ({ ...prev, category }));
       setEditingCategory(false);
-      
-      // Senaryoları yenile
       fetchScenarios();
     } catch (err) {
       console.error('Kategori güncellenirken hata oluştu:', err);
@@ -146,7 +228,6 @@ function Scenarios({ setIsAuthenticated }) {
         { headers: { Authorization: `Bearer ${token}` } }
       );
       
-      // Kategorileri yenile
       fetchCategories();
       setNewCategory('');
     } catch (err) {
@@ -155,13 +236,31 @@ function Scenarios({ setIsAuthenticated }) {
     }
   };
 
+  // Onay durumu badge'i
+  const getApprovalStatusBadge = (status) => {
+    switch (status) {
+      case 'pending':
+        return <span className="status-badge pending">Onay Bekliyor</span>;
+      case 'rejected':
+        return <span className="status-badge rejected">Reddedildi</span>;
+      case 'approved':
+        return <span className="status-badge approved">Onaylandı</span>;
+      default:
+        return <span className="status-badge approved">Onaylandı</span>;
+    }
+  };
+
+  // Kullanıcının senaryoyu düzenleyip düzenleyemeyeceğini kontrol etme
+  const canEditScenario = (scenario) => {
+    return user && (user.isAdmin || (scenario.userId === user.id && scenario.approvalStatus !== 'pending'));
+  };
+
   return (
     <Layout user={user} setIsAuthenticated={setIsAuthenticated}>
       <div className="scenarios-content">
         <div className="page-header">
           <h1 className="page-title">Oluşturulan Senaryolar</h1>
           <div className="header-actions">
-            {/* Kategori filtresi */}
             <div className="filter-container">
               <select
                 value={selectedCategory}
@@ -177,7 +276,6 @@ function Scenarios({ setIsAuthenticated }) {
               </select>
             </div>
             
-            {/* Admin için yeni kategori ekleme */}
             {user && user.isAdmin && (
               <div className="admin-actions">
                 <button 
@@ -195,7 +293,6 @@ function Scenarios({ setIsAuthenticated }) {
               </div>
             )}
             
-            {/* Yenile butonu */}
             <button 
               className="refresh-button" 
               onClick={handleRefresh} 
@@ -227,9 +324,12 @@ function Scenarios({ setIsAuthenticated }) {
               >
                 <div className="scenario-card-header">
                   <span className="scenario-user">{scenario.username}</span>
-                  <span className="scenario-date">
-                    {new Date(scenario.createdAt).toLocaleDateString('tr-TR')}
-                  </span>
+                  <div className="scenario-meta-info">
+                    <span className="scenario-date">
+                      {new Date(scenario.createdAt).toLocaleDateString('tr-TR')}
+                    </span>
+                    {getApprovalStatusBadge(scenario.approvalStatus)}
+                  </div>
                 </div>
                 <div className="scenario-info">
                   <div className="scenario-team">
@@ -239,6 +339,11 @@ function Scenarios({ setIsAuthenticated }) {
                     <span className="info-label">Kategori:</span> {scenario.category}
                   </div>
                 </div>
+                {scenario.isEdited && (
+                  <div className="edit-indicator">
+                    <span className="edit-badge">Düzenlenmiş</span>
+                  </div>
+                )}
                 <div className="scenario-preview">
                   <h4>Öngörüler:</h4>
                   <p>{scenario.ongoruler.length > 100 
@@ -251,7 +356,7 @@ function Scenarios({ setIsAuthenticated }) {
           </div>
         )}
         
-        {selectedScenario && (
+        {selectedScenario && !isEditing && (
           <div className="modal-overlay" onClick={closeModal}>
             <div className="scenario-modal" onClick={e => e.stopPropagation()}>
               <div className="modal-header">
@@ -261,9 +366,12 @@ function Scenarios({ setIsAuthenticated }) {
               <div className="modal-content">
                 <div className="modal-user-info">
                   <span className="user-name">{selectedScenario.username}</span>
-                  <span className="scenario-date">
-                    {new Date(selectedScenario.createdAt).toLocaleDateString('tr-TR')}
-                  </span>
+                  <div className="scenario-status-info">
+                    <span className="scenario-date">
+                      {new Date(selectedScenario.createdAt).toLocaleDateString('tr-TR')}
+                    </span>
+                    {getApprovalStatusBadge(selectedScenario.approvalStatus)}
+                  </div>
                 </div>
                 
                 <div className="scenario-meta">
@@ -310,6 +418,29 @@ function Scenarios({ setIsAuthenticated }) {
                     )}
                   </div>
                 </div>
+
+                {/* Onay durumu bilgisi */}
+                {selectedScenario.approvalStatus === 'rejected' && selectedScenario.rejectionReason && (
+                  <div className="rejection-info">
+                    <h4>Red Nedeni:</h4>
+                    <p className="rejection-reason">{selectedScenario.rejectionReason}</p>
+                  </div>
+                )}
+
+                {/* Düzenleme geçmişi */}
+                {selectedScenario.editHistory && selectedScenario.editHistory.length > 0 && (
+                  <div className="edit-history">
+                    <h4>Düzenleme Geçmişi:</h4>
+                    {selectedScenario.editHistory.map((edit, index) => (
+                      <div key={index} className="edit-history-item">
+                        <span className="edit-date">
+                          {new Date(edit.editedAt).toLocaleString('tr-TR')}
+                        </span>
+                        <span className="edit-reason">Neden: {edit.editReason}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
                 
                 <div className="scenario-section">
                   <h4>Öngörüler:</h4>
@@ -319,6 +450,92 @@ function Scenarios({ setIsAuthenticated }) {
                 <div className="scenario-section">
                   <h4>Oluşturulan Senaryo:</h4>
                   <p className="scenario-text">{selectedScenario.scenario}</p>
+                </div>
+
+                {/* Düzenleme butonu */}
+                {canEditScenario(selectedScenario) && (
+                  <div className="modal-actions">
+                    <button 
+                      className="edit-scenario-button"
+                      onClick={() => startEditing(selectedScenario)}
+                    >
+                      Senaryoyu Düzenle
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Düzenleme Modalı */}
+        {isEditing && editingScenario && (
+          <div className="modal-overlay" onClick={closeModal}>
+            <div className="edit-modal" onClick={e => e.stopPropagation()}>
+              <div className="modal-header">
+                <h3>Senaryo Düzenle</h3>
+                <button className="close-button" onClick={closeModal}>×</button>
+              </div>
+              <div className="modal-content">
+                <div className="edit-form">
+                  <div className="form-group">
+                    <label>Öngörüler:</label>
+                    <textarea
+                      name="ongoruler"
+                      value={editForm.ongoruler}
+                      onChange={handleEditFormChange}
+                      rows="6"
+                      className="edit-textarea"
+                    />
+                  </div>
+                  
+                  <div className="form-group">
+                    <label>Senaryo:</label>
+                    <div className="scenario-edit-section">
+                      <textarea
+                        name="scenario"
+                        value={editForm.scenario}
+                        onChange={handleEditFormChange}
+                        rows="8"
+                        className="edit-textarea"
+                      />
+                      <button 
+                        className="regenerate-button"
+                        onClick={generateNewScenario}
+                        disabled={editLoading}
+                      >
+                        {editLoading ? 'Oluşturuluyor...' : 'AI ile Yeniden Oluştur'}
+                      </button>
+                    </div>
+                  </div>
+                  
+                  <div className="form-group">
+                    <label>Düzenleme Nedeni:</label>
+                    <textarea
+                      name="editReason"
+                      value={editForm.editReason}
+                      onChange={handleEditFormChange}
+                      rows="3"
+                      className="edit-textarea"
+                      placeholder="Bu düzenlemeyi neden yaptığınızı açıklayın..."
+                    />
+                  </div>
+                  
+                  <div className="edit-actions">
+                    <button 
+                      className="save-edit-button"
+                      onClick={saveEdit}
+                      disabled={editLoading}
+                    >
+                      {editLoading ? 'Kaydediliyor...' : 'Değişiklikleri Kaydet'}
+                    </button>
+                    <button 
+                      className="cancel-edit-button"
+                      onClick={closeModal}
+                    >
+                      İptal
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
